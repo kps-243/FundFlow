@@ -13,3 +13,18 @@ body {
   background-color: var(--color-neutral);
   color: var(--color-black);
 }
+
+.slider {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+.slide {
+  min-width: 33%;
+  height: 150px;
+  scroll-snap-align: center;
+  flex-shrink: 0;
+}
