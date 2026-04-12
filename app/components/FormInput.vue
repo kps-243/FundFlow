@@ -47,7 +47,7 @@ function onInput(e: Event) {
         @click="togglePassword"
         class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
       >
-        <span class="text-sm">{{ isPasswordVisible ? '🙈' : '👁️' }}</span>
+        <Icon :name="isPasswordVisible ? 'lucide:eye-off' : 'lucide:eye'" class="w-4 h-4" />
       </button>
     </div>
     <p v-if="error" class="text-red-500 text-xs mt-1">{{ error }}</p>

@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { useBudgetStore } from '~/stores/budget'
+import { useTransactionStore } from '~/stores/transaction'
 
 export interface User {
   id: string
@@ -96,6 +97,8 @@ export const useAuthStore = defineStore('auth', {
       }
       const budgetStore = useBudgetStore()
       budgetStore.clear()
+      const transactionStore = useTransactionStore()
+      transactionStore.clear()
     }
   }
 })
