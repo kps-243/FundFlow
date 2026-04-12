@@ -5,7 +5,6 @@ const dashboardNavbar = [
   { label: 'Home', link: '/', icon: 'lucide:layout-dashboard' },
   { label: 'Transactions', link: '/transactions', icon: 'lucide:arrow-left-right' },
   { label: 'Budget', link: '/budget', icon: 'lucide:wallet' },
-  { label: 'Reports', link: '/reports', icon: 'lucide:bar-chart-2' },
 ]
 </script>
 
