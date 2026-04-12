@@ -43,7 +43,9 @@ function onKeydown(e: KeyboardEvent) {
 <template>
   <div class="bg-white rounded-2xl p-5 flex flex-col gap-4 w-full">
     <div class="flex items-center gap-3">
-      <span class="text-2xl">{{ icon }}</span>
+      <div class="w-9 h-9 rounded-full bg-purple/10 flex items-center justify-center shrink-0">
+        <Icon :name="icon" class="w-5 h-5 text-purple" />
+      </div>
       <span class="font-semibold text-gray-800">{{ label }}</span>
     </div>
 
@@ -54,8 +56,9 @@ function onKeydown(e: KeyboardEvent) {
         </span>
         <button
           @click="startEdit"
-          class="text-sm text-gray-400 hover:text-purple transition-colors cursor-pointer px-3 py-1 rounded-lg hover:bg-purple/10"
+          class="text-sm text-gray-400 hover:text-purple transition-colors cursor-pointer px-3 py-1 rounded-lg hover:bg-purple/10 flex items-center gap-1"
         >
+          <Icon name="lucide:pencil" class="w-3.5 h-3.5" />
           Modifier
         </button>
       </div>

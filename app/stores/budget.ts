@@ -1,12 +1,12 @@
 import { defineStore } from 'pinia'
 
 export const categories = [
-  { key: 'transport', label: 'Transport', icon: '🚗' },
-  { key: 'loisirs', label: 'Loisirs', icon: '🎮' },
-  { key: 'sante', label: 'Santé', icon: '❤️' },
-  { key: 'logement', label: 'Logement', icon: '🏠' },
-  { key: 'alimentaire', label: 'Alimentaire', icon: '🛒' },
-  { key: 'education', label: 'Éducation', icon: '📚' },
+  { key: 'transport', label: 'Transport', icon: 'lucide:car' },
+  { key: 'loisirs', label: 'Loisirs', icon: 'lucide:gamepad-2' },
+  { key: 'sante', label: 'Santé', icon: 'lucide:heart' },
+  { key: 'logement', label: 'Logement', icon: 'lucide:home' },
+  { key: 'alimentaire', label: 'Alimentaire', icon: 'lucide:shopping-cart' },
+  { key: 'education', label: 'Éducation', icon: 'lucide:book-open' },
 ] as const
 
 export type CategoryKey = typeof categories[number]['key']
@@ -61,6 +61,24 @@ export const useBudgetStore = defineStore('budget', {
 
     setCategoryBudget(key: CategoryKey, amount: number) {
       this.budgets[key] = Math.max(0, amount)
+      this.save()
+    },
+
+    applyTransaction(key: CategoryKey, amount: number, type: 'depense' | 'benefice') {
+      if (type === 'depense') {
+        this.budgets[key] -= amount
+      } else {
+        this.budgets[key] += amount
+      }
+      this.save()
+    },
+
+    reverseTransaction(key: CategoryKey, amount: number, type: 'depense' | 'benefice') {
+      if (type === 'depense') {
+        this.budgets[key] += amount
+      } else {
+        this.budgets[key] -= amount
+      }
       this.save()
     },
 
