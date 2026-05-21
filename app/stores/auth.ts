@@ -99,6 +99,8 @@ export const useAuthStore = defineStore('auth', {
       budgetStore.clear()
       const transactionStore = useTransactionStore()
       transactionStore.clear()
+      const premiumStore = usePremiumStore()
+      premiumStore.clear()
     }
   }
 })
