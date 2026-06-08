@@ -6,14 +6,33 @@ definePageMeta({
 const premiumStore = usePremiumStore()
 const router = useRouter()
 const { checkoutStart } = useTracking()
+const { $captureException, $addBreadcrumb } = useNuxtApp() as {
+  $captureException?: (e: unknown) => void
+  $addBreadcrumb?: (b: Record<string, unknown>) => void
+}
+
+// Mesure du temps de chargement dès la création du composant
+const perfStart = import.meta.client ? performance.now() : 0
 
 onMounted(() => {
   if (premiumStore.isPremium) {
     router.replace('/premium/success')
     return
   }
+
   // Étape 3 : l'utilisateur accède au formulaire de paiement
   checkoutStart(PREMIUM_PRODUCT)
+
+  // Performance tracking : temps de chargement de la page checkout
+  if (import.meta.client) {
+    const loadTime = Math.round(performance.now() - perfStart)
+    $addBreadcrumb?.({
+      category: 'performance',
+      message: `Checkout page loaded in ${loadTime}ms`,
+      level: 'info',
+      data: { load_time_ms: loadTime, page: 'checkout' }
+    })
+  }
 })
 
 const form = reactive({
@@ -31,6 +50,7 @@ const errors = reactive({
 })
 
 const isLoading = ref(false)
+const paymentError = ref('')
 
 function validate() {
   errors.cardName = ''
@@ -78,7 +98,23 @@ async function handleSubmit() {
   if (!validate()) return
 
   isLoading.value = true
-  await new Promise(resolve => setTimeout(resolve, 1400))
+  paymentError.value = ''
+
+  await new Promise(r => setTimeout(r, 800))
+
+  // Simulation de panne intermittente (1 fois sur 3)
+  // → génère un TypeError capturé par GlitchTip pour valider la remontée d'alertes
+  if (Math.random() < 1 / 3) {
+    const error = new TypeError(
+      "PaymentProcessor: Cannot read properties of undefined (reading 'charge')"
+    )
+    $captureException?.(error)
+    isLoading.value = false
+    paymentError.value = 'Erreur de traitement du paiement. Veuillez réessayer.'
+    return
+  }
+
+  await new Promise(r => setTimeout(r, 600))
   premiumStore.activate()
   router.push('/premium/success')
 }
@@ -105,6 +141,15 @@ async function handleSubmit() {
         <span class="text-sm font-semibold text-gray-800">FundFlow Premium</span>
       </div>
       <span class="text-sm font-bold text-purple">9,99 € / mois</span>
+    </div>
+
+    <!-- Erreur paiement (remontée GlitchTip) -->
+    <div
+      v-if="paymentError"
+      class="bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg px-4 py-3 mb-5 flex items-center gap-2"
+    >
+      <Icon name="lucide:circle-x" class="w-4 h-4 shrink-0" />
+      {{ paymentError }}
     </div>
 
     <!-- Formulaire de paiement -->

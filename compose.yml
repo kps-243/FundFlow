@@ -1,0 +1,172 @@
+name: fundflow
+
+services:
+
+  # ─────────────────────────────── Reverse Proxy ────────────────────────────
+  traefik:
+    image: traefik:v3.0
+    command:
+      - --api.insecure=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+    ports:
+      - "80:80"
+      - "8080:8080" # Dashboard Traefik → http://localhost:8080
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - proxy
+    restart: unless-stopped
+
+  # ──────────────────────────── Application Web ─────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      NUXT_PUBLIC_GLITCHTIP_DSN: ${NUXT_PUBLIC_GLITCHTIP_DSN:-}
+      NUXT_PUBLIC_UMAMI_WEBSITE_ID: ${NUXT_PUBLIC_UMAMI_WEBSITE_ID:-}
+      NUXT_PUBLIC_UMAMI_URL: ${NUXT_PUBLIC_UMAMI_URL:-http://umami.localhost}
+    depends_on:
+      glitchtip:
+        condition: service_healthy
+      umami:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.app.rule=Host(`app.localhost`)
+      - traefik.http.services.app.loadbalancer.server.port=3000
+    networks:
+      - proxy
+    restart: unless-stopped
+
+  # ──────────────────────────────── GlitchTip ───────────────────────────────
+  glitchtip-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${GLITCHTIP_DB_NAME:-glitchtip}
+      POSTGRES_USER: ${GLITCHTIP_DB_USER:-glitchtip}
+      POSTGRES_PASSWORD: ${GLITCHTIP_DB_PASS:-glitchtip_secret}
+    volumes:
+      - glitchtip_db:/var/lib/postgresql/data
+    networks:
+      - glitchtip-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${GLITCHTIP_DB_USER:-glitchtip}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  glitchtip-redis:
+    image: redis:7-alpine
+    volumes:
+      - glitchtip_redis:/data
+    networks:
+      - glitchtip-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  glitchtip:
+    image: glitchtip/glitchtip:latest
+    depends_on:
+      glitchtip-db:
+        condition: service_healthy
+      glitchtip-redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${GLITCHTIP_DB_USER:-glitchtip}:${GLITCHTIP_DB_PASS:-glitchtip_secret}@glitchtip-db:5432/${GLITCHTIP_DB_NAME:-glitchtip}
+      REDIS_URL: redis://glitchtip-redis:6379/0
+      SECRET_KEY: ${GLITCHTIP_SECRET_KEY:-change_me_at_least_32_chars_long!}
+      EMAIL_URL: ${EMAIL_URL:-consolemail://}
+      GLITCHTIP_DOMAIN: ${GLITCHTIP_DOMAIN:-http://glitchtip.localhost}
+      DEFAULT_FROM_EMAIL: noreply@fundflow.local
+      CELERY_WORKER_CONCURRENCY: "2"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.glitchtip.rule=Host(`glitchtip.localhost`)
+      - traefik.http.services.glitchtip.loadbalancer.server.port=8000
+    networks:
+      - proxy
+      - glitchtip-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+  glitchtip-worker:
+    image: glitchtip/glitchtip:latest
+    depends_on:
+      glitchtip-db:
+        condition: service_healthy
+      glitchtip-redis:
+        condition: service_healthy
+    command: celery -A glitchtip worker -B -l INFO
+    environment:
+      DATABASE_URL: postgresql://${GLITCHTIP_DB_USER:-glitchtip}:${GLITCHTIP_DB_PASS:-glitchtip_secret}@glitchtip-db:5432/${GLITCHTIP_DB_NAME:-glitchtip}
+      REDIS_URL: redis://glitchtip-redis:6379/0
+      SECRET_KEY: ${GLITCHTIP_SECRET_KEY:-change_me_at_least_32_chars_long!}
+    networks:
+      - glitchtip-net
+    restart: unless-stopped
+
+  # ────────────────────────────────── Umami ─────────────────────────────────
+  umami-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${UMAMI_DB_NAME:-umami}
+      POSTGRES_USER: ${UMAMI_DB_USER:-umami}
+      POSTGRES_PASSWORD: ${UMAMI_DB_PASS:-umami_secret}
+    volumes:
+      - umami_db:/var/lib/postgresql/data
+    networks:
+      - umami-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${UMAMI_DB_USER:-umami}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  umami:
+    image: ghcr.io/umami-software/umami:postgresql-latest
+    depends_on:
+      umami-db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${UMAMI_DB_USER:-umami}:${UMAMI_DB_PASS:-umami_secret}@umami-db:5432/${UMAMI_DB_NAME:-umami}
+      DATABASE_TYPE: postgresql
+      APP_SECRET: ${UMAMI_APP_SECRET:-change_me_at_least_32_chars_long!}
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.umami.rule=Host(`umami.localhost`)
+      - traefik.http.services.umami.loadbalancer.server.port=3000
+    networks:
+      - proxy
+      - umami-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:3000/api/heartbeat || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+# ──────────────────────────────────────────────────────────────────────────────
+volumes:
+  glitchtip_db:
+  glitchtip_redis:
+  umami_db:
+
+networks:
+  proxy:
+  glitchtip-net:
+  umami-net:
